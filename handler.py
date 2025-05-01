@@ -61,7 +61,7 @@ def upload_temp_file(username, files):
 def download_video(url, download_path, username):
     try:
         # === LOKASI OUTPUT FILE ===
-        output_template = str(username) + "downloaded_video.%(ext)s"
+        output_template = os.path.join(download_path, f"{username}_downloaded_video.%(ext)s")
 
         # === DOWNLOAD DENGAN yt-dlp ===
         ydl_opts = {
@@ -81,7 +81,14 @@ def download_video(url, download_path, username):
 
         # === UPLOAD KE CLOUDINARY ===
         res = upload_temp_file(username, video_filename)
-        
+
+        try:
+            # === HAPUS FILE VIDEO SETELAH DIUPLOAD ===
+            if os.path.exists(video_filename):
+                os.remove(video_filename)
+        except Exception as e:
+            print(str(e))
+
         return res
     except Exception as e:
         print(f"Error saat mengunduh video: {e}")
@@ -91,7 +98,6 @@ def send_hook(hook_url, data):
     req = requests.post(hook_url, json=data)
 
 # --- Handler RunPod ---
-
 def handler(job):
     """
     Handler utama untuk job RunPod Serverless.
@@ -119,13 +125,13 @@ def handler(job):
 
         # 2. callback ke kreator ai
         if webhook:
-            send_data = send_hook(webhook, uploaded)
+            send_hook(webhook, uploaded)
+
         # 3. doing transformation
         public_id = uploaded.get('public_id')
         output_url = CloudinaryVideo(public_id).build_url(secure=True, transformation=[
             {"start_offset": start_time, "end_offset": end_time},
         ])
-
 
         # 5. Kembalikan hasil (URL jika upload berhasil)
         print(f"Proses selesai. Output URL: {output_url}")
